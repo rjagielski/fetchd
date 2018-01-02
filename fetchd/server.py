@@ -1,38 +1,51 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
-import logging
-import asyncio
 import argparse
-
+import asyncio
+import collections
+import functools
+import logging
+import time
+from itsdangerous import Signer, BadSignature
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--host', default='127.0.0.1')
 parser.add_argument('--port', default=8888, type=int)
+parser.add_argument('key')
 args = parser.parse_args()
 
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+signer = Signer(args.key)
 
-async def handle_message(reader, writer):
+
+async def handle_message(reader, writer, queue):
     data = await reader.read()
-    message = data.decode()
-    logger.debug('Data received: %s', message)
+    try:
+        path = signer.unsign(data).decode()
+    except BadSignature:
+        logger.error('Invalid signature in message: %s', data)
+    else:
+        queue.put_nowait(path)
+
+
+async def fetch_queue(queue):
+    while True:
+        message = await queue.get()
+        time.sleep(3)
+        logger.info(message)
 
 
 def run():
     loop = asyncio.get_event_loop()
-    coro = asyncio.start_server(handle_message, args.host, args.port, loop=loop)
-    server = loop.run_until_complete(coro)
+    queue = asyncio.Queue(loop=loop)
+    srv_coro = asyncio.start_server(functools.partial(handle_message, queue=queue),
+                                    args.host, args.port, loop=loop)
+    fetch_coro = fetch_queue(queue)
 
-    print('Serving on {}'.format(server.sockets[0].getsockname()))
-    try:
-        loop.run_forever()
-    finally:
-        server.close()
-        loop.run_until_complete(server.wait_closed())
-        loop.close()
+    loop.run_until_complete(asyncio.gather(srv_coro, fetch_coro))
 
 
 if __name__ == "__main__":

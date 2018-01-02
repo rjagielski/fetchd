@@ -1,19 +1,28 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import argparse
 import asyncio
+import logging
+from itsdangerous import Signer
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--host', default='127.0.0.1')
 parser.add_argument('--port', default=8888, type=int)
+parser.add_argument('key')
 parser.add_argument('path')
 args = parser.parse_args()
 
 
 async def send_path(loop):
+    signer = Signer(args.key)
+    message = signer.sign(args.path.encode('utf-8'))
+    logger.debug('message: %s', message)
+
     _, writer = await asyncio.open_connection(args.host, args.port, loop=loop)
-    writer.write(args.path.encode())
+    writer.write(message)
     writer.close()
 
 
