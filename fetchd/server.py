@@ -1,31 +1,38 @@
 #!/usr/bin/python
 
-import socket
 import logging
+import asyncio
+import argparse
 
 
-HOST = ''
-PORT = 50007
+parser = argparse.ArgumentParser()
+parser.add_argument('--host', default='127.0.0.1')
+parser.add_argument('--port', default=8888, type=int)
+args = parser.parse_args()
+
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-def run():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOST, PORT))
-        s.listen(1)
+async def handle_message(reader, writer):
+    data = await reader.read()
+    message = data.decode()
+    logger.debug('Data received: %s', message)
 
-        try:
-            while True:
-                conn, addr = s.accept()
-                with conn:
-                    logging.info('Connection from %s', addr)
-                    while True:
-                        data = conn.recv(1024)
-                        if not data: break
-                        conn.sendall(data)
-        finally:
-            connection.close()
+
+def run():
+    loop = asyncio.get_event_loop()
+    coro = asyncio.start_server(handle_message, args.host, args.port, loop=loop)
+    server = loop.run_until_complete(coro)
+
+    print('Serving on {}'.format(server.sockets[0].getsockname()))
+    try:
+        loop.run_forever()
+    finally:
+        server.close()
+        loop.run_until_complete(server.wait_closed())
+        loop.close()
 
 
 if __name__ == "__main__":
