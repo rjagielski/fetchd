@@ -5,13 +5,15 @@ import asyncio
 import collections
 import functools
 import logging
-import time
+import subprocess
 from itsdangerous import Signer, BadSignature
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--host', default='127.0.0.1')
 parser.add_argument('--port', default=8888, type=int)
 parser.add_argument('key')
+parser.add_argument('target_dir')
+parser.add_argument('rsync_host')
 args = parser.parse_args()
 
 
@@ -19,6 +21,13 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 signer = Signer(args.key)
+
+
+def run_rsync(remote_path):
+    source = '{}:{}'.format(args.rsync_host, remote_path)
+    cmd = ['/bin/rsync', '-a', '--partial', '-r', source, args.target_dir]
+    logger.debug('Running rsync: %s', ' '.join(cmd))
+    subprocess.run(cmd)
 
 
 async def handle_message(reader, writer, queue):
@@ -33,9 +42,8 @@ async def handle_message(reader, writer, queue):
 
 async def fetch_queue(queue):
     while True:
-        message = await queue.get()
-        time.sleep(3)
-        logger.info(message)
+        path = await queue.get()
+        run_rsync(path)
 
 
 def run():
