@@ -20,6 +20,7 @@ args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
 signer = Signer(args.key)
 
 
@@ -28,6 +29,7 @@ def run_rsync(remote_path):
     cmd = ['/bin/rsync', '-a', '--partial', '-r', source, args.target_dir]
     logger.debug('Running rsync: %s', ' '.join(cmd))
     subprocess.run(cmd)
+    logger.info('Fetching complete %s', os.path.basename(remote_path))
 
 
 async def handle_message(reader, writer, queue):
@@ -38,6 +40,7 @@ async def handle_message(reader, writer, queue):
         logger.error('Invalid signature in message: %s', data)
     else:
         queue.put_nowait(path)
+        logger.info('Added to queue: %s', path)
 
 
 async def fetch_queue(queue):
