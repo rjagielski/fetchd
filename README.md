@@ -8,6 +8,7 @@ rsync. Paths need to be signed with itsdangerous.
 # Example commands
 
 fetchd/server.py 'security-key' /home/user/sync-here user@example.com
+
 fetchd/client.py 'sucurity-key' '/path/to/sync'
 
 # Compatibility
