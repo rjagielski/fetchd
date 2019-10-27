@@ -7,7 +7,7 @@ import functools
 import logging
 import os
 import subprocess
-from itsdangerous import Signer, BadSignature
+from itsdangerous import TimestampSigner, BadSignature
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--host', default='127.0.0.1')
@@ -22,21 +22,35 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-signer = Signer(args.key)
+signer = TimestampSigner(args.key)
+
+
+async def run_cmd(cmd):
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE)
+
+    stdout, stderr = await proc.communicate()
+
+    if stdout:
+        print(f'[stdout]\n{stdout.decode()}')
+    if stderr:
+        print(f'[stderr]\n{stderr.decode()}')
 
 
 def run_rsync(remote_path):
     source = '{}:{}'.format(args.rsync_host, remote_path)
     cmd = ['/bin/rsync', '-a', '--partial', '-r', source, args.target_dir]
     logger.debug('Running rsync: %s', ' '.join(cmd))
-    subprocess.run(cmd)
+    await run_cmd(cmd)
     logger.info('Fetching complete %s', os.path.basename(remote_path))
 
 
 async def handle_message(reader, writer, queue):
     data = await reader.read()
     try:
-        path = signer.unsign(data).decode()
+        path = signer.unsign(data, max_age=5).decode()
     except BadSignature:
         logger.error('Invalid signature in message: %s', data)
     else:

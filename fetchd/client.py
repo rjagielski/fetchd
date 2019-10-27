@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 import logging
-from itsdangerous import Signer
+from itsdangerous import TimestampSigner
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 
 async def send_path(loop):
-    signer = Signer(args.key)
+    signer = TimestampSigner(args.key)
     message = signer.sign(args.path.encode('utf-8'))
     logger.debug('message: %s', message)
 
